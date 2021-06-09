@@ -5,13 +5,18 @@ import Header from "./Header";
 import AddContact from "./AddContact";
 import ContactList from "./ContactList";
 import ContactDetail from "./ContactDetail";
+import EditContact from "./EditContact";
 import api from "../Api/contact.js";
+import swal from "sweetalert";
 
 function App() {
   // Key for storing contact on the localStorage
   const LOCAL_STORAGE_KEY = "contacts";
   // Contacts state from the react hooks
   const [contacts, setContacts] = useState([]);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
 
   // Retrieve contact list
   const retrieveContacts = async () => {
@@ -39,9 +44,26 @@ function App() {
 
   /**
    *
+   * @param {*} contact
+   */
+  const updateContactHandler = async (contact) => {
+    const response = await api.post("/update", contact);
+    const { id, name, email } = response.data;
+    setContacts(
+      contacts.map((contact) => {
+        return contact.id === id ? { ...response.data } : contact;
+      })
+    );
+  };
+
+  /**
+   *
    * @param {Integer} id
    */
-  const removeContactHandler = (id) => {
+  const removeContactHandler = async (id) => {
+    const response = await api.post(`/delete/${id}`);
+    swal("success", response.data, "success");
+
     // copy of the contact list and filter out the contact by id
     const newContactList = contacts.filter((contact) => {
       return contact.id !== id;
@@ -49,6 +71,21 @@ function App() {
 
     // change the contact state
     setContacts(newContactList);
+  };
+
+  const searchHandler = (searchTerm) => {
+    setSearchTerm(searchTerm);
+    if (searchTerm !== "") {
+      const newContactList = contacts.filter((contact) => {
+        return Object.values(contact)
+          .join(" ")
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase());
+      });
+      setSearchResults(newContactList);
+    } else {
+      setSearchResults(contacts);
+    }
   };
 
   // Set the contacts after reloading the page
@@ -85,8 +122,10 @@ function App() {
             ) => (
               <ContactList
                 {...props}
-                contacts={contacts}
+                contacts={searchTerm.length < 1 ? contacts : searchResults}
                 getContactId={removeContactHandler}
+                term={searchTerm}
+                searchKeyword={searchHandler}
               />
             )}
           />
@@ -97,6 +136,15 @@ function App() {
             )}
           />
 
+          <Route
+            path="/edit"
+            render={(props) => (
+              <EditContact
+                {...props}
+                updateContactHandler={updateContactHandler}
+              />
+            )}
+          />
           <Route path="/contact/:id" component={ContactDetail}></Route>
         </Switch>
       </Router>
